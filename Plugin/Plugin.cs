@@ -16,6 +16,7 @@ public class Plugin : BasePlugin
 {
 #nullable disable
     internal static new ManualLogSource Log;
+    internal static ConfigEntry<bool> ScrollWhileWalking;
     internal static ConfigEntry<float> Speed;
     internal static ConfigEntry<bool> IndexJoystick;
     internal static ConfigEntry<bool> BlockInputWorld;
@@ -25,7 +26,8 @@ public class Plugin : BasePlugin
     public override void Load()
     {
         Log = base.Log;
-
+        
+        ScrollWhileWalking = Config.Bind("General", "ScrollWhileWalking", true, "Always allows scrolling, even if it means you'd walk and scroll at the same time.");
         Speed = Config.Bind("General", "Speed", 120f, "How fast you scroll, default is 120.");
         IndexJoystick = Config.Bind("General", "IndexJoystick", false, "Use the joystick on index controller.");
         BlockInputWorld = Config.Bind("General", "BlockInputWorld", false, "Prevent moving when hovering over a scrollable element in world space.");
@@ -41,12 +43,12 @@ public class Plugin : BasePlugin
 		public static void Postfix(InteractionHandler __instance)
 		{
 			if (__instance.InputInterface.ScreenActive) return;
-				
-			if (__instance.Inputs.Axis.RegisterBlocks)
+
+			var index = __instance.InputInterface.GetControllerNode(__instance.Side) as IndexController;
+			if (ScrollWhileWalking.Value || (index != null && !IndexJoystick.Value) || __instance.Inputs.Axis.RegisterBlocks)
 			{
 				float2 val;
-				if (IndexJoystick.Value && 
-				    __instance.InputInterface.GetControllerNode(__instance.Side) is IndexController index)
+				if (index != null && IndexJoystick.Value)
 				{
 					val = index.Joystick.Value;
 				}
@@ -104,6 +106,10 @@ public class Plugin : BasePlugin
 			}
 			else if (__instance.World == Userspace.UserspaceWorld)
 			{
+				// Required for NoTankControls+InspectorScroll
+				if(BlockInputUser.Value)
+					__instance.Inputs.Axis.RegisterBlocks = true;
+				
 				if (__instance.Side == Chirality.Left)
 				{
 					if (userSpaceHandlerLeft.FilterWorldElement() == null)
